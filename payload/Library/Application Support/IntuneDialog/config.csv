@@ -1,0 +1,15 @@
+# Format: AppName,/Path/To/App1.app[,/Path/To/App2.app,...]
+# This file is used by setup.sh to monitor application installation progress.
+# Each line defines one application and the full paths to one or more .app bundles that must be detected in the install.log.
+# 
+# IMPORTANT:
+# The first column (AppName) must exactly match the list item "title" used in swiftdialog.json.
+# This ensures SwiftDialog UI updates correctly for each monitored application.
+#
+# Lines starting with '#' are ignored.
+#
+# Example:
+# Company Portal,/Applications/Company Portal.app
+
+Company Portal,/Applications/Company Portal.app
+Microsoft Office 365,/Applications/Microsoft Word.app,/Applications/Microsoft Excel.app,/Applications/Microsoft PowerPoint.app,/Applications/Microsoft OneNote.app,/Applications/Microsoft Outlook.app,/Applications/Microsoft Teams.app,/Applications/OneDrive.app

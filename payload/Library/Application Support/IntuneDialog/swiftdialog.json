@@ -1,0 +1,22 @@
+{
+  "title": "Welcome to GGE!",
+  "icon": "/Library/Application Support/IntuneDialog/icons/logo.png",
+  "iconsize": 400,
+  "infobox": "Finalizing your Mac configuration.<br>This may take several minutes.<br>Ensure the device remains connected to power and do not close the lid or restart.",
+  "backgroundcolor": "#123123",
+  "button1text": "Exit",
+  "listitem": [
+    {
+      "title": "Company Portal",
+      "icon": "/Library/Application Support/IntuneDialog/icons/CompanyPortal.png",
+      "status": "pending",
+      "statustext": "Pending"
+    },
+    {
+      "title": "Microsoft Office 365",
+      "icon": "/Library/Application Support/IntuneDialog/icons/MicrosoftOffice365.png",
+      "status": "pending",
+      "statustext": "Pending"
+    }
+  ]
+}

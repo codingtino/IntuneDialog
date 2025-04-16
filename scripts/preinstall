@@ -1,0 +1,147 @@
+#!/bin/bash
+
+# -----------------------------------------------------------------------------
+# Script Name: preinstall
+# Description: Downloads and prepares necessary resources
+# Author: Tino Naumann
+# Created: 2025-05-17
+# -----------------------------------------------------------------------------
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# Constants
+readonly PROJECT_NAME="IntuneDialog"
+readonly RESOURCE_DIR="/Library/Application Support/$PROJECT_NAME"
+readonly LOG_DIR="/Library/Logs/$PROJECT_NAME"
+readonly WORK_DIR="$(mktemp -d)"
+readonly PLIST_PATH="/Library/LaunchDaemons/com.ggeg.intunedialog.plist"
+readonly REPO_ZIP_URL="https://github.com/codingtino/IntuneDialog/archive/main.zip"
+readonly DIALOG_PKG_URL="https://github.com/swiftDialog/swiftDialog/releases/download/v2.5.5/dialog-2.5.5-4802.pkg"
+readonly DIALOG_PKG_LOCAL_PATH="$WORK_DIR/dialog.pkg"
+readonly DIALOG_BINARY_PATH="/usr/local/bin/dialog"
+readonly RETRIES=3
+readonly RETRY_DELAY=5
+
+# === Logging Functions ===
+init_logging() {
+  # Initializes logging by redirecting stdout and stderr to a logfile.
+  local logfile="${1:-"$LOG_DIR/$(basename "${BASH_SOURCE[1]:-$0}" | cut -d '.' -f1).log"}"
+  mkdir -p "$(dirname "$logfile")"
+  exec > >(tee -a "$logfile") 2>&1
+}
+
+log() {
+  # Simple logging function with timestamp and log level.
+  local level="$1"
+  local message="$2"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') | $(echo "$level" | tr '[:lower:]' '[:upper:]') | $message"
+}
+
+cleanup() {
+  # Deletes the temporary work directory and logs the cleanup step.
+  rm -rf "$WORK_DIR"
+  log "info" "Cleanup completed."
+}
+
+# === Requirement Check ===
+check_prerequisites() {
+  # Verifies prerequisites before running the onboarding logic
+
+  if [[ -f "$RESOURCE_DIR/$PROJECT_NAME.installed" ]]; then
+    log "info" "We've already completed installation. Exiting."
+    exit 0
+  fi
+}
+
+# === Download Utilities ===
+download_file() {
+  # Downloads a file from a given URL to a specified destination using curl.
+  local url="$1"
+  local destination="$2"
+
+  if curl -Lso "$destination" "$url"; then
+    log "info" "Successfully downloaded: $url"
+  else
+    log "error" "Failed to download: $url"
+    exit 1
+  fi
+}
+
+# === Dialog Installation ===
+install_dialog() {
+  # Installs SwiftDialog if not already present. Retries on failure.
+  if [[ ! -x "$DIALOG_BINARY_PATH" ]]; then
+    log "info" "SwiftDialog is not installed. Installing..."
+    download_file "$DIALOG_PKG_URL" "$DIALOG_PKG_LOCAL_PATH"
+
+    local attempt=1
+    until sudo installer -pkg "$DIALOG_PKG_LOCAL_PATH" -target / >/dev/null; do
+      log "warn" "Installer attempt $attempt failed. Retrying..."
+      ((attempt++))
+      if ((attempt > RETRIES)); then
+        log "error" "SwiftDialog installation failed after $RETRIES attempts."
+        exit 1
+      fi
+      sleep "$RETRY_DELAY"
+    done
+
+    log "info" "SwiftDialog installed successfully."
+  else
+    log "info" "SwiftDialog is already installed."
+  fi
+}
+
+# === Resource Fetching ===
+fetch_resources() {
+  # Downloads the main repository ZIP and extracts payload resources.
+  log "info" "Downloading from: $REPO_ZIP_URL"
+  download_file "$REPO_ZIP_URL" "$WORK_DIR/archive.zip"
+
+  log "info" "Extracting zip archive..."
+  local attempt=1
+  until unzip -q "$WORK_DIR/archive.zip" -d "$WORK_DIR"; do
+    log "warn" "Unzip attempt $attempt failed. Retrying..."
+    ((attempt++))
+    if ((attempt > RETRIES)); then
+      log "error" "Failed to extract zip after $RETRIES attempts."
+      exit 1
+    fi
+    sleep "$RETRY_DELAY"
+  done
+
+  # Dynamically find the extracted directory
+  local extracted_dir
+  extracted_dir=$(find "$WORK_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+
+  if [[ ! -d "$extracted_dir/payload" ]]; then
+    log "error" "Expected payload directory not found in $extracted_dir."
+    exit 1
+  fi
+
+  log "info" "Copying IntuneDialog resources..."
+  attempt=1
+  until rsync -a --delete "$extracted_dir/payload/" "$RESOURCE_DIR"; do
+    log "warn" "Rsync attempt $attempt failed. Retrying..."
+    ((attempt++))
+    if ((attempt > RETRIES)); then
+      log "error" "Failed to copy resources after $RETRIES attempts."
+      exit 1
+    fi
+    sleep "$RETRY_DELAY"
+  done
+
+  log "info" "Resources copied successfully."
+}
+
+# === Main Execution ===
+init_logging
+trap cleanup EXIT
+check_prerequisites
+log "info" "Starting installation..."
+
+install_dialog
+#fetch_resources
+
+log "info" "Installation completed successfully."
+exit 0
