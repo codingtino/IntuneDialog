@@ -97,8 +97,8 @@ launch_dialog() {
   while [ $attempt -le $MAX_ATTEMPTS ]; do
     log "info" "Attempting to launch Swift Dialog (Attempt $attempt of $MAX_ATTEMPTS)"
     killall Dialog >/dev/null 2>&1
+    set +e
     (
-      set +e # Prevent set -e from killing the subshell silently
       log "info" "Launching Swift Dialog binary..."
       "$DIALOG_BIN" \
         ${blur_flags} \
@@ -108,7 +108,6 @@ launch_dialog() {
         --messagealignment "left" \
         --button1disabled \
         --button2text "Reboot Now" \
-        --blurscreen --ontop \
         --width 1280 --height 500 || log "error" "Dialog failed to launch"
       exit_code=$?
       log "info" "Swift Dialog exited with code $exit_code"
@@ -126,6 +125,7 @@ launch_dialog() {
         shutdown -r now >/dev/null 2>&1
       fi
     ) &
+    set -e
 
     for ((i = 1; i <= DIALOG_TIMEOUT; i++)); do
       dialog_pid=$(pgrep -i -f "$DIALOG_BIN")
