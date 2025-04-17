@@ -9,6 +9,7 @@
 
 set -euo pipefail
 IFS=$'\n\t'
+# for debugging
 set -x
 
 DEBUG="false"
@@ -128,7 +129,7 @@ launch_dialog() {
     } &
 
     for ((i = 1; i <= $DIALOG_TIMEOUT; i++)); do
-      dialog_pid=$(pgrep -x Dialog || true)
+      dialog_pid="$(pgrep -x Dialog || true)"
       if [ -n "$dialog_pid" ]; then
         log "info" "Swift Dialog launched successfully on attempt $attempt with PID ${dialog_pid}."
         touch "$RESOURCE_DIR/$PROJECT_NAME.lock"
@@ -222,7 +223,7 @@ parse_config() {
 wait_for_dialog_exit() {
   # Waits until SwiftDialog process has exited.
   log "info" "Waiting for Swift Dialog process to exit..."
-  while pgrep -i -f Dialog; do
+  while [[ -n "$(pgrep -x Dialog 2>/dev/null || true)" ]]; do
     sleep 1
   done
   log "info" "Swift Dialog process has exited."
@@ -244,9 +245,9 @@ check_prerequisites
 trap cleanup EXIT
 wait_for_dock
 launch_dialog
-#parse_config
-#finalize_onboarding
-#wait_for_dialog_exit
+parse_config
+finalize_onboarding
+wait_for_dialog_exit
 log "info" "Finished Setup. Exiting cleanly."
 
 exit 0
