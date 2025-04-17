@@ -16,6 +16,8 @@ readonly RESOURCE_DIR="/Library/Application Support/$PROJECT_NAME"
 readonly LOG_DIR="/Library/Logs/$PROJECT_NAME"
 readonly WORK_DIR="$(mktemp -d)"
 readonly RESOURCE_ZIP="https://raw.githubusercontent.com/codingtino/IntuneDialog/main/ggeg/resources.zip"
+
+readonly RESOURCE_FILE="/var/tmp/${PROJECT_NAME}_resource.url"
 readonly DIALOG_PKG_URL="https://github.com/swiftDialog/swiftDialog/releases/download/v2.5.5/dialog-2.5.5-4802.pkg"
 readonly DIALOG_PKG_LOCAL_PATH="$WORK_DIR/dialog.pkg"
 readonly DIALOG_BINARY_PATH="/usr/local/bin/dialog"
@@ -53,9 +55,30 @@ check_prerequisites() {
     exit 0
   fi
 
-  if [[ -f "$RESOURCE_DIR/$PROJECT_NAME.installed" ]]; then
-    log "info" "We've already completed installation. Exiting."
-    exit 0
+  if [[ ! -f "$RESOURCE_FILE" ]]; then
+    log "error" "Resource file not found at $RESOURCE_FILE"
+    exit 1
+  fi
+
+  # Read and sanitize the resource URL
+  RESOURCE_ZIP="$(tr -d '\r' <"$RESOURCE_FILE" | xargs)"
+
+  # Validate it's not empty
+  if [[ -z "$RESOURCE_ZIP" ]]; then
+    log "error" "Resource URL is empty in $RESOURCE_FILE"
+    exit 1
+  fi
+
+  # Validate basic URL format
+  if [[ ! "$RESOURCE_ZIP" =~ ^https?://[a-zA-Z0-9./_-]+\.zip$ ]]; then
+    log "error" "Resource URL is invalid or not a .zip file: $RESOURCE_ZIP"
+    exit 1
+  fi
+
+  # Optional: Check if URL is reachable
+  if ! curl -Is --max-time 5 "$RESOURCE_ZIP" | grep -qE "^HTTP/[0-9.]+\s+200"; then
+    log "error" "Resource URL is not reachable: $RESOURCE_ZIP"
+    exit 1
   fi
 }
 
