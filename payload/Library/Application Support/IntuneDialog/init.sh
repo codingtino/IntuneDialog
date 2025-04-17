@@ -103,7 +103,7 @@ launch_dialog() {
     {
       log "info" "Launching Swift Dialog binary..."
       "$DIALOG_BIN" \
-        "${blur_flags[@]}" \
+        "${blur_flags[@]:-}" \
         --jsonfile "$DIALOG_CONFIG" \
         --commandfile "$COMMAND_FILE" \
         --presentation \
