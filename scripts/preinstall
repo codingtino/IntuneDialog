@@ -17,9 +17,7 @@ readonly LOG_DIR="/Library/Logs/$PROJECT_NAME"
 readonly WORK_DIR="$(mktemp -d)"
 readonly RESOURCE_FILE="/var/tmp/${PROJECT_NAME}_resource.url"
 readonly DIALOG_PKG_URL="https://github.com/swiftDialog/swiftDialog/releases/download/v2.5.5/dialog-2.5.5-4802.pkg"
-readonly DIALOG_PKG_LOCAL_PATH="$WORK_DIR/dialog.pkg"
 readonly DIALOG_BINARY_PATH="/usr/local/bin/dialog"
-readonly RESOURCE_URL="/usr/local/bin/dialog"
 readonly RETRIES=3
 readonly RETRY_DELAY=5
 
@@ -42,6 +40,23 @@ cleanup() {
   # Deletes the temporary work directory and logs the cleanup step.
   rm -rf "$WORK_DIR"
   log "info" "Cleanup completed."
+}
+
+# === Utility Functions ===
+retry_until_success() {
+  local cmd="$1"
+  local action="$2"
+  local attempt=1
+
+  until eval "$cmd"; do
+    log "warn" "$action attempt $attempt failed. Retrying..."
+    ((attempt++))
+    if ((attempt > RETRIES)); then
+      log "error" "$action failed after $RETRIES attempts."
+      exit 1
+    fi
+    sleep "$RETRY_DELAY"
+  done
 }
 
 # === Requirement Check ===
@@ -86,7 +101,7 @@ download_file() {
   local url="$1"
   local destination="$2"
 
-  if curl -Lso "$destination" "$url"; then
+  if curl --retry $RETRIES --retry-delay 5 --retry-connrefused -Lso "$destination" "$url"; then
     log "info" "Successfully downloaded: $url"
   else
     log "error" "Failed to download: $url"
@@ -99,18 +114,9 @@ install_dialog() {
   # Installs SwiftDialog if not already present. Retries on failure.
   if [[ ! -x "$DIALOG_BINARY_PATH" ]]; then
     log "info" "SwiftDialog is not installed. Installing..."
-    download_file "$DIALOG_PKG_URL" "$DIALOG_PKG_LOCAL_PATH"
+    download_file "$DIALOG_PKG_URL" "$WORK_DIR/dialog.pkg"
 
-    local attempt=1
-    until sudo installer -pkg "$DIALOG_PKG_LOCAL_PATH" -target / >/dev/null; do
-      log "warn" "Installer attempt $attempt failed. Retrying..."
-      ((attempt++))
-      if ((attempt > RETRIES)); then
-        log "error" "SwiftDialog installation failed after $RETRIES attempts."
-        exit 1
-      fi
-      sleep "$RETRY_DELAY"
-    done
+    retry_until_success "sudo installer -pkg \"$WORK_DIR/dialog.pkg\" -target / >/dev/null" "SwiftDialog installation"
 
     log "info" "SwiftDialog installed successfully."
   else
@@ -127,16 +133,7 @@ fetch_resources() {
   log "info" "Extracting zip archive to $RESOURCE_DIR..."
   mkdir -p "$RESOURCE_DIR"
 
-  local attempt=1
-  until unzip -q "$WORK_DIR/resources.zip" -d "$RESOURCE_DIR"; do
-    log "warn" "Unzip attempt $attempt failed. Retrying..."
-    ((attempt++))
-    if ((attempt > RETRIES)); then
-      log "error" "Failed to extract resources after $RETRIES attempts."
-      exit 1
-    fi
-    sleep "$RETRY_DELAY"
-  done
+  retry_until_success "unzip -q \"$WORK_DIR/resources.zip\" -d \"$RESOURCE_DIR\"" "Resource extraction"
 
   log "info" "Resources extracted successfully to $RESOURCE_DIR."
 }
