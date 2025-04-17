@@ -15,8 +15,6 @@ readonly PROJECT_NAME="IntuneDialog"
 readonly RESOURCE_DIR="/Library/Application Support/$PROJECT_NAME"
 readonly LOG_DIR="/Library/Logs/$PROJECT_NAME"
 readonly WORK_DIR="$(mktemp -d)"
-readonly RESOURCE_ZIP="https://raw.githubusercontent.com/codingtino/IntuneDialog/main/ggeg/resources.zip"
-
 readonly RESOURCE_FILE="/var/tmp/${PROJECT_NAME}_resource.url"
 readonly DIALOG_PKG_URL="https://github.com/swiftDialog/swiftDialog/releases/download/v2.5.5/dialog-2.5.5-4802.pkg"
 readonly DIALOG_PKG_LOCAL_PATH="$WORK_DIR/dialog.pkg"
