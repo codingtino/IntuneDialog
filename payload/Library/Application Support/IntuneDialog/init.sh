@@ -45,6 +45,25 @@ cleanup() {
   log "info" "Cleanup completed."
 }
 
+check_prerequisites() {
+  # Verifies prerequisites before running the onboarding logic
+
+  if [[ ! -x "$DIALOG_BIN" ]]; then
+    log "error" "Dialog binary not found at $DIALOG_BIN. Exiting..."
+    exit 1
+  fi
+
+  if [[ -f "$LOG_DIR/$PROJECT_NAME.done" ]]; then
+    log "info" "We've already completed onboarding. Exiting."
+    exit 0
+  fi
+
+  if [[ -f "$RESOURCE_DIR/$PROJECT_NAME.lock" ]]; then
+    log "info" "We are already running. Exiting."
+    exit 0
+  fi
+}
+
 wait_for_dock() {
   # Waits until the Dock process is available, indicating a user session.
   log "info" "Dock not running, waiting"
@@ -64,6 +83,8 @@ launch_dialog() {
     log "info" "Attempting to launch Swift Dialog (Attempt $attempt of $MAX_ATTEMPTS)"
     killall Dialog >/dev/null 2>&1
     (
+      set +e # Prevent set -e from killing the subshell silently
+      log "info" "Launching Swift Dialog binary..."
       "$DIALOG_BIN" \
         --jsonfile "$DIALOG_CONFIG" \
         --commandfile "$COMMAND_FILE" \
@@ -72,15 +93,16 @@ launch_dialog() {
         --button1disabled \
         --button2text "Reboot Now" \
         --blurscreen --ontop \
-        --width 1280 --height 500
-
+        --width 1280 --height 500 || log "error" "Dialog failed to launch"
       exit_code=$?
       log "info" "Swift Dialog exited with code $exit_code"
+
+      log "info" "Swift Dialog exited"
 
       if [ "$exit_code" -eq 2 ]; then
         log "info" "User clicked Reboot Now. Rebooting..."
         if rm -f "$RESOURCE_DIR/$PROJECT_NAME.lock"; then
-          log "info" "dialog.lock successfully removed."
+          log "info" "$PROJECT_NAME.lock successfully removed."
         else
           log "warning" "Failed to remove dialog.lock. It may not exist or permission was denied."
         fi
@@ -189,25 +211,6 @@ wait_for_dialog_exit() {
     sleep 1
   done
   log "info" "Swift Dialog process has exited."
-}
-
-check_prerequisites() {
-  # Verifies prerequisites before running the onboarding logic
-
-  if [[ ! -x "$DIALOG_BIN" ]]; then
-    log "error" "Dialog binary not found at $DIALOG_BIN. Exiting..."
-    exit 1
-  fi
-
-  if [[ -f "$LOG_DIR/$PROJECT_NAME.done" ]]; then
-    log "info" "We've already completed onboarding. Exiting."
-    exit 0
-  fi
-
-  if [[ -f "$RESOURCE_DIR/$PROJECT_NAME.lock" ]]; then
-    log "info" "We are already running. Exiting."
-    exit 0
-  fi
 }
 
 finalize_onboarding() {

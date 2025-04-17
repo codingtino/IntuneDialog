@@ -14,6 +14,6 @@ pkgbuild \
   --version "$VERSION" \
   --root ./payload \
   --scripts ./scripts \
-  "$PKG_NAME"
+  "./builds/$PKG_NAME"
 
 echo "✅ .pkg created: $PKG_NAME"
