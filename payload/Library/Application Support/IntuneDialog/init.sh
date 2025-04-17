@@ -9,6 +9,7 @@
 
 set -euo pipefail
 IFS=$'\n\t'
+set -x
 
 DEBUG="false"
 # Constants
@@ -88,31 +89,31 @@ wait_for_dock() {
 launch_dialog() {
   # Attempts to launch SwiftDialog up to MAX_ATTEMPTS with a timeout check.
   local attempt=1
-  local blur_flags=""
+  local blur_flags=()
 
-  if [[ "$DEBUG" == "true" ]]; then
-    blur_flags="--blurscreen --ontop"
+  if [[ "$DEBUG" == "false" ]]; then
+    blur_flags+=(--blurscreen --ontop)
   fi
 
   while [ $attempt -le $MAX_ATTEMPTS ]; do
     log "info" "Attempting to launch Swift Dialog (Attempt $attempt of $MAX_ATTEMPTS)"
-    killall Dialog >/dev/null 2>&1
-    set +e
-    (
+    killall Dialog >/dev/null 2>&1 || true
+
+    # Start Dialog in background and handle errors safely
+    {
       log "info" "Launching Swift Dialog binary..."
       "$DIALOG_BIN" \
-        ${blur_flags} \
+        "${blur_flags[@]}" \
         --jsonfile "$DIALOG_CONFIG" \
         --commandfile "$COMMAND_FILE" \
         --presentation \
         --messagealignment "left" \
         --button1disabled \
         --button2text "Reboot Now" \
-        --width 1280 --height 500 || log "error" "Dialog failed to launch"
-      exit_code=$?
-      log "info" "Swift Dialog exited with code $exit_code"
+        --width 1280 --height 500
 
-      log "info" "Swift Dialog exited"
+      local exit_code=$?
+      log "info" "Swift Dialog exited with code $exit_code"
 
       if [ "$exit_code" -eq 2 ]; then
         log "info" "User clicked Reboot Now. Rebooting..."
@@ -124,11 +125,10 @@ launch_dialog() {
         sleep 2
         shutdown -r now >/dev/null 2>&1
       fi
-    ) &
-    set -e
+    } &
 
-    for ((i = 1; i <= DIALOG_TIMEOUT; i++)); do
-      dialog_pid=$(pgrep -i -f "$DIALOG_BIN")
+    for ((i = 1; i <= $DIALOG_TIMEOUT; i++)); do
+      dialog_pid="$(pgrep -i -f "$DIALOG_BIN" 2>/dev/null || true)"
       if [ -n "$dialog_pid" ]; then
         log "info" "Swift Dialog launched successfully on attempt $attempt with PID ${dialog_pid}."
         touch "$RESOURCE_DIR/$PROJECT_NAME.lock"
@@ -244,9 +244,9 @@ check_prerequisites
 trap cleanup EXIT
 wait_for_dock
 launch_dialog
-parse_config
-finalize_onboarding
-wait_for_dialog_exit
+#parse_config
+#finalize_onboarding
+#wait_for_dialog_exit
 log "info" "Finished Setup. Exiting cleanly."
 
 exit 0
