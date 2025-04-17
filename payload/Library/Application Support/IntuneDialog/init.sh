@@ -10,6 +10,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+DEBUG="false"
 # Constants
 readonly PROJECT_NAME="IntuneDialog"
 readonly RESOURCE_DIR="/Library/Application Support/$PROJECT_NAME"
@@ -17,7 +18,7 @@ readonly LOG_DIR="/Library/Logs/$PROJECT_NAME"
 readonly DIALOG_BIN="/usr/local/bin/dialog"
 readonly COMMAND_FILE="/var/tmp/dialog.log"
 readonly CONFIG_FILE="$RESOURCE_DIR/config.csv"
-readonly DIALOG_CONFIG=$RESOURCE_DIR/swiftdialog.json
+readonly DIALOG_CONFIG="$RESOURCE_DIR/swiftdialog.json"
 readonly INSTALL_LOG="/var/log/install.log"
 readonly SLEEP_TIME=60
 readonly MAX_RETRIES=30
@@ -45,6 +46,15 @@ cleanup() {
   log "info" "Cleanup completed."
 }
 
+check_debug() {
+  # switch $DEBUG to true when the file $RESOURCE_DIR/$PROJECT_NAME.debug exists
+  if [[ -f "$RESOURCE_DIR/$PROJECT_NAME.debug" ]]; then
+    DEBUG="true"
+  else
+    DEBUG="false"
+  fi
+}
+
 check_prerequisites() {
   # Verifies prerequisites before running the onboarding logic
 
@@ -53,7 +63,7 @@ check_prerequisites() {
     exit 1
   fi
 
-  if [[ -f "$LOG_DIR/$PROJECT_NAME.done" ]]; then
+  if [[ -f "$RESOURCE_DIR/$PROJECT_NAME.done" ]]; then
     log "info" "We've already completed onboarding. Exiting."
     exit 0
   fi
@@ -77,7 +87,12 @@ wait_for_dock() {
 
 launch_dialog() {
   # Attempts to launch SwiftDialog up to MAX_ATTEMPTS with a timeout check.
-  attempt=1
+  local attempt=1
+  local blur_flags=""
+
+  if [[ "$DEBUG" == "true" ]]; then
+    blur_flags="--blurscreen --ontop"
+  fi
 
   while [ $attempt -le $MAX_ATTEMPTS ]; do
     log "info" "Attempting to launch Swift Dialog (Attempt $attempt of $MAX_ATTEMPTS)"
@@ -86,6 +101,7 @@ launch_dialog() {
       set +e # Prevent set -e from killing the subshell silently
       log "info" "Launching Swift Dialog binary..."
       "$DIALOG_BIN" \
+        ${blur_flags} \
         --jsonfile "$DIALOG_CONFIG" \
         --commandfile "$COMMAND_FILE" \
         --presentation \
@@ -137,13 +153,12 @@ monitor_app() {
   local app_name="$1"
   local app_paths=("${@:2}") # All remaining args are app paths
   local app_log="$LOG_DIR/$(echo "$app_name" | tr -cs 'A-Za-z0-9' '_').log"
+  local start_detected=false
+  local retries=0
   init_logging "$app_log"
 
   {
     log "info" "Monitoring installation of $app_name..."
-
-    local start_detected=false
-    local retries=0
 
     while ((retries < MAX_RETRIES)); do
       # --- Success condition: All bundles touched
@@ -190,11 +205,11 @@ monitor_app() {
 parse_config() {
   # Parses config CSV file and spawns background jobs to monitor each app.
   log "info" "Processing scripts..."
-  job_pids=()
+  local job_pids=()
   while IFS=',' read -ra fields; do
     [[ ${#fields[@]} -eq 0 || -z "${fields[0]:-}" || "${fields[0]:-}" == \#* ]] && continue
-    app_name="${fields[0]}"
-    app_paths=("${fields[@]:1}")
+    local app_name="${fields[0]}"
+    local app_paths=("${fields[@]:1}")
     monitor_app "$app_name" "${app_paths[@]}"
     job_pids+=($!)
   done <"$CONFIG_FILE"
@@ -218,12 +233,13 @@ finalize_onboarding() {
   log "info" "All application monitoring jobs finished."
   echo "infobox: ✅ All required applications have been installed. You may now click Continue or Reboot." >>"$COMMAND_FILE"
   echo "button1: enable" >>"$COMMAND_FILE"
-  touch "$LOG_DIR/$PROJECT_NAME.done"
+  touch "$RESOURCE_DIR/$PROJECT_NAME.done"
 }
 
 # === Main Execution ===
 init_logging
 log "info" "Starting onboarding script..."
+check_debug
 check_prerequisites
 trap cleanup EXIT
 wait_for_dock

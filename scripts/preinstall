@@ -20,6 +20,7 @@ readonly REPO_ZIP_URL="https://github.com/codingtino/IntuneDialog/archive/main.z
 readonly DIALOG_PKG_URL="https://github.com/swiftDialog/swiftDialog/releases/download/v2.5.5/dialog-2.5.5-4802.pkg"
 readonly DIALOG_PKG_LOCAL_PATH="$WORK_DIR/dialog.pkg"
 readonly DIALOG_BINARY_PATH="/usr/local/bin/dialog"
+readonly RESOURCE_URL="/usr/local/bin/dialog"
 readonly RETRIES=3
 readonly RETRY_DELAY=5
 
@@ -47,6 +48,11 @@ cleanup() {
 # === Requirement Check ===
 check_prerequisites() {
   # Verifies prerequisites before running the onboarding logic
+
+  if [[ -f "$RESOURCE_DIR/$PROJECT_NAME.installed" ]]; then
+    log "info" "We've already completed installation. Exiting."
+    exit 0
+  fi
 
   if [[ -f "$RESOURCE_DIR/$PROJECT_NAME.installed" ]]; then
     log "info" "We've already completed installation. Exiting."
