@@ -15,8 +15,7 @@ readonly PROJECT_NAME="IntuneDialog"
 readonly RESOURCE_DIR="/Library/Application Support/$PROJECT_NAME"
 readonly LOG_DIR="/Library/Logs/$PROJECT_NAME"
 readonly WORK_DIR="$(mktemp -d)"
-readonly PLIST_PATH="/Library/LaunchDaemons/com.ggeg.intunedialog.plist"
-readonly REPO_ZIP_URL="https://github.com/codingtino/IntuneDialog/archive/main.zip"
+readonly RESOURCE_ZIP="https://raw.githubusercontent.com/codingtino/IntuneDialog/main/ggeg/resources.zip"
 readonly DIALOG_PKG_URL="https://github.com/swiftDialog/swiftDialog/releases/download/v2.5.5/dialog-2.5.5-4802.pkg"
 readonly DIALOG_PKG_LOCAL_PATH="$WORK_DIR/dialog.pkg"
 readonly DIALOG_BINARY_PATH="/usr/local/bin/dialog"
@@ -100,44 +99,25 @@ install_dialog() {
 
 # === Resource Fetching ===
 fetch_resources() {
-  # Downloads the main repository ZIP and extracts payload resources.
-  log "info" "Downloading from: $REPO_ZIP_URL"
-  download_file "$REPO_ZIP_URL" "$WORK_DIR/archive.zip"
+  # Downloads the resource ZIP and extracts it to the resource directory.
+  log "info" "Downloading resources from: $RESOURCE_ZIP"
+  download_file "$RESOURCE_ZIP" "$WORK_DIR/resources.zip"
 
-  log "info" "Extracting zip archive..."
+  log "info" "Extracting zip archive to $RESOURCE_DIR..."
+  mkdir -p "$RESOURCE_DIR"
+
   local attempt=1
-  until unzip -q "$WORK_DIR/archive.zip" -d "$WORK_DIR"; do
+  until unzip -q "$WORK_DIR/resources.zip" -d "$RESOURCE_DIR"; do
     log "warn" "Unzip attempt $attempt failed. Retrying..."
     ((attempt++))
     if ((attempt > RETRIES)); then
-      log "error" "Failed to extract zip after $RETRIES attempts."
+      log "error" "Failed to extract resources after $RETRIES attempts."
       exit 1
     fi
     sleep "$RETRY_DELAY"
   done
 
-  # Dynamically find the extracted directory
-  local extracted_dir
-  extracted_dir=$(find "$WORK_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
-
-  if [[ ! -d "$extracted_dir/payload" ]]; then
-    log "error" "Expected payload directory not found in $extracted_dir."
-    exit 1
-  fi
-
-  log "info" "Copying IntuneDialog resources..."
-  attempt=1
-  until rsync -a --delete "$extracted_dir/payload/" "$RESOURCE_DIR"; do
-    log "warn" "Rsync attempt $attempt failed. Retrying..."
-    ((attempt++))
-    if ((attempt > RETRIES)); then
-      log "error" "Failed to copy resources after $RETRIES attempts."
-      exit 1
-    fi
-    sleep "$RETRY_DELAY"
-  done
-
-  log "info" "Resources copied successfully."
+  log "info" "Resources extracted successfully to $RESOURCE_DIR."
 }
 
 # === Main Execution ===
@@ -147,7 +127,7 @@ check_prerequisites
 log "info" "Starting installation..."
 
 install_dialog
-#fetch_resources
+fetch_resources
 
 log "info" "Installation completed successfully."
 exit 0
