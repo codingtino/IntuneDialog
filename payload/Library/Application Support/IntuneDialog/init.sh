@@ -150,40 +150,48 @@ launch_dialog() {
 }
 
 monitor_app() {
-  # Monitors installation of an app by checking the install log for app-specific entries.
   local app_name="$1"
-  local app_paths=("${@:2}") # All remaining args are app paths
+  local start_mode="$2"
+  local start_patterns="$3"
+  local success_mode="$4"
+  local success_patterns="$5"
   local app_log="$LOG_DIR/$(echo "$app_name" | tr -cs 'A-Za-z0-9' '_').log"
   local start_detected=false
   local retries=0
   init_logging "$app_log"
 
+  IFS=';' read -r -a start_array <<<"$(echo "$start_patterns" | sed 's/^;*//;s/;*$//')"
+  IFS=';' read -r -a success_array <<<"$(echo "$success_patterns" | sed 's/^;*//;s/;*$//')"
+
   {
     log "info" "Monitoring installation of $app_name..."
 
     while ((retries < MAX_RETRIES)); do
-      # --- Success condition: All bundles touched
-      local all_touched=true
-      for app_path in "${app_paths[@]}"; do
-        if ! grep -Fq "Touched bundle $app_path" "$INSTALL_LOG"; then
-          all_touched=false
+      # Success pattern check
+      local success_hits=0
+      for pattern in "${success_array[@]}"; do
+        if grep -Eq "$pattern" "$INSTALL_LOG"; then
+          ((success_hits++))
+          [[ "$success_mode" == "any" ]] && break
+        elif [[ "$success_mode" == "all" ]]; then
+          success_hits=-1
           break
         fi
       done
 
-      if $all_touched; then
-        log "success" "All $app_name components have been touched (installed)."
+      if { [[ "$success_mode" == "any" && $success_hits -gt 0 ]] || [[ "$success_mode" == "all" && $success_hits -ge 0 ]]; }; then
+        log "success" "All $app_name success conditions met."
         echo "listitem: title: $app_name, status: success, statustext: Installed" >>"$COMMAND_FILE"
         log "info" "Installation of $app_name...finished"
         exit 0
       fi
 
-      # --- Start condition: Any path matched with pre/postinstall
+      # Start pattern check
       if ! $start_detected; then
-        for app_path in "${app_paths[@]}"; do
-          if grep -Eq "\./(pre|post)install:.*$app_path" "$INSTALL_LOG"; then
+        for pattern in "${start_array[@]}"; do
+          if grep -Eq "$pattern" "$INSTALL_LOG"; then
             start_detected=true
-            log "info" "Detected start of $app_name installation (via $app_path)"
+            log "info" "Detected start of $app_name installation (pattern: $pattern)"
             echo "listitem: title: $app_name, status: wait, statustext: Installing..." >>"$COMMAND_FILE"
             break
           fi
@@ -196,7 +204,6 @@ monitor_app() {
     done
 
     log "error" "$app_name failed to install after $((SLEEP_TIME * MAX_RETRIES)) seconds."
-    log "error" "Wait 1 minute and trigger restart."
     echo "listitem: title: $app_name, status: fail, statustext: Failed to install" >>"$COMMAND_FILE"
     sleep 60
     echo "button2:" >>"$COMMAND_FILE"
@@ -204,14 +211,17 @@ monitor_app() {
 }
 
 parse_config() {
-  # Parses config CSV file and spawns background jobs to monitor each app.
   log "info" "Processing scripts..."
   local job_pids=()
-  while IFS=',' read -ra fields; do
-    [[ ${#fields[@]} -eq 0 || -z "${fields[0]:-}" || "${fields[0]:-}" == \#* ]] && continue
-    local app_name="${fields[0]}"
-    local app_paths=("${fields[@]:1}")
-    monitor_app "$app_name" "${app_paths[@]}"
+  while IFS=',' read -r app_name start_mode start_patterns success_mode success_patterns; do
+    [[ -z "${app_name:-}" || "${app_name:0:1}" == "#" ]] && continue
+
+    if [[ -z "$start_mode" || -z "$start_patterns" || -z "$success_mode" || -z "$success_patterns" ]]; then
+      log "warning" "Skipping invalid config line for app '$app_name'. Must have 5 fields."
+      continue
+    fi
+
+    monitor_app "$app_name" "$start_mode" "$start_patterns" "$success_mode" "$success_patterns"
     job_pids+=($!)
   done <"$CONFIG_FILE"
 

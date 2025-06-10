@@ -1,15 +1,17 @@
-# Format: AppName,/Path/To/App1.app[,/Path/To/App2.app,...]
-# This file is used by setup.sh to monitor application installation progress.
-# Each line defines one application and the full paths to one or more .app bundles that must be detected in the install.log.
+# AppName,StartMatchMode,StartPatterns,SuccessMatchMode,SuccessPatterns
 # 
-# IMPORTANT:
-# The first column (AppName) must exactly match the list item "title" used in swiftdialog.json.
-# This ensures SwiftDialog UI updates correctly for each monitored application.
+# This config is used to monitor application installations based on /var/log/install.log
+# - AppName: Must match the title in swiftdialog.json
+# - StartMatchMode and SuccessMatchMode: either "any" or "all"
+# - StartPatterns and SuccessPatterns: semicolon-separated regex strings
 #
-# Lines starting with '#' are ignored.
+# Notes:
+# - Regexes are matched against install.log using grep -E
+# - Leading/trailing semicolons are allowed and stripped
+# - The monitoring script supports parallel checks and retries
 #
-# Example:
-# Company Portal,/Applications/Company Portal.app
+# Company Portal: Detects start by script log lines, finishes on bundle touch
+"Company Portal","any",".*/preinstall:.*Company Portal;.*Company Portal with old bundle ID","any",".*Touched bundle /Applications/Company Portal.app"
 
-Company Portal,/Applications/Company Portal.app
-Microsoft Office 365,/Applications/Microsoft Word.app,/Applications/Microsoft Excel.app,/Applications/Microsoft PowerPoint.app,/Applications/Microsoft OneNote.app,/Applications/Microsoft Outlook.app,/Applications/Microsoft Teams.app,/Applications/OneDrive.app
+# Microsoft Office 365: Looks for OneDrive.pkg extraction or Word install as start; finishes when all main apps are touched
+"Microsoft Office 365","any",".*Microsoft Word.*\\.pkg.*install.*;.*OneDrive.*\\.pkg.*install.*","all",".*Touched bundle /Applications/Microsoft Word.app;.*Touched bundle /Applications/Microsoft Excel.app;.*Touched bundle /Applications/Microsoft PowerPoint.app;.*Touched bundle /Applications/Microsoft OneNote.app;.*Touched bundle /Applications/Microsoft Outlook.app;.*Touched bundle /Applications/Microsoft Teams.app;.*Touched bundle /Applications/OneDrive.app"
