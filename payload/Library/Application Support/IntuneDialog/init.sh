@@ -170,7 +170,7 @@ monitor_app() {
       # Success pattern check
       local success_hits=0
       for pattern in "${success_array[@]}"; do
-        if grep -Eq "$pattern" "$INSTALL_LOG"; then
+        if grep -Fq "$pattern" "$INSTALL_LOG"; then
           ((success_hits++))
           [[ "$success_mode" == "any" ]] && break
         elif [[ "$success_mode" == "all" ]]; then
@@ -189,7 +189,7 @@ monitor_app() {
       # Start pattern check
       if ! $start_detected; then
         for pattern in "${start_array[@]}"; do
-          if grep -Eq "$pattern" "$INSTALL_LOG"; then
+          if grep -Fq "$pattern" "$INSTALL_LOG"; then
             start_detected=true
             log "info" "Detected start of $app_name installation (pattern: $pattern)"
             echo "listitem: title: $app_name, status: wait, statustext: Installing..." >>"$COMMAND_FILE"

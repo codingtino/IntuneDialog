@@ -6,7 +6,7 @@
 # - StartPatterns and SuccessPatterns: semicolon-separated regex strings
 #
 # Notes:
-# - Regexes are matched against install.log using grep -E
+# - Regexes are matched against install.log using grep -F
 # - Leading/trailing semicolons are allowed and stripped
 # - The monitoring script supports parallel checks and retries
 #
