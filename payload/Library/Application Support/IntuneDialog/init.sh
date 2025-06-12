@@ -162,8 +162,17 @@ monitor_app() {
 
   #  IFS=';' read -r -a start_array <<<"$(echo "$start_patterns" | sed 's/^;*//;s/;*$//')"
   #  IFS=';' read -r -a success_array <<<"$(echo "$success_patterns" | sed 's/^;*//;s/;*$//')"
-  readarray -d ';' -t start_array < <(printf '%s;' "$start_patterns")
-  readarray -d ';' -t success_array < <(printf '%s;' "$success_patterns")
+  start_array=()
+  IFS=';'
+  for token in $start_patterns; do
+    start_array+=("$token")
+  done
+
+  success_array=()
+  for token in $success_patterns; do
+    success_array+=("$token")
+  done
+  unset IFS
 
   {
     log "info" "Monitoring installation of $app_name..."
