@@ -14,4 +14,4 @@
 Company Portal,any,/Applications/Company Portal.app,any,com.apple.extensiblesso
 
 # Microsoft Office 365: Looks for OneDrive.pkg extraction or Word install as start; finishes when all main apps are touched
-Microsoft Office 365,any,Microsoft_365,all,Application was installed at: file:///Applications/Microsoft%20Word.app;Application was installed at: file:///Applications/Microsoft%20Excel.app;Application was installed at: file:///Applications/Microsoft%20PowerPoint.app;Application was installed at: file:///Applications/Microsoft%20OneNote.app;Application was installed at: file:///Applications/Microsoft%20Outlook.app;Application was installed at: file:///Applications/Microsoft%20Teams.app;Application was installed at: file:///Applications/OneDrive.app
+Microsoft Office 365,any,Microsoft_365,all,Application was installed at: file:///Applications/Microsoft%20Word.app
