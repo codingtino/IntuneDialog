@@ -182,7 +182,7 @@ monitor_app() {
       # Success pattern check
       local success_hits=0
       for pattern in "${success_array[@]}"; do
-        if log show --predicate "eventMessage contains[c] \"$pattern\"" --last 1d | grep -q "$pattern"; then
+        if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 1h | grep -Fq "$pattern"; then
           ((success_hits++))
           [[ "$success_mode" == "any" ]] && break
         elif [[ "$success_mode" == "all" ]]; then
@@ -201,7 +201,7 @@ monitor_app() {
       # Start pattern check
       if ! $start_detected; then
         for pattern in "${start_array[@]}"; do
-          if log show --predicate "eventMessage contains[c] \"$pattern\"" --last 1d | grep -q "$pattern"; then
+          if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 1h | grep -Fq "$pattern"; then
             start_detected=true
             log "info" "Detected start of $app_name installation (pattern: $pattern)"
             echo "listitem: title: $app_name, status: wait, statustext: Installing..." >>"$COMMAND_FILE"
