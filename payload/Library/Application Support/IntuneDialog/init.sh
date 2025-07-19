@@ -10,7 +10,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 # for debugging
-set -x
+#set -x
 
 DEBUG="false"
 # Constants
@@ -124,9 +124,10 @@ launch_dialog() {
           log "warning" "Failed to remove dialog.lock. It may not exist or permission was denied."
         fi
         sleep 2
-        shutdown -r now >/dev/null 2>&1
+        osascript -e 'tell app "System Events" to restart'
       fi
     } &
+    DIALOG_SUBSHELL_PID=$!
 
     for ((i = 1; i <= $DIALOG_TIMEOUT; i++)); do
       dialog_pid="$(pgrep -x Dialog || true)"
@@ -250,6 +251,16 @@ wait_for_dialog_exit() {
   log "info" "Swift Dialog process has exited."
 }
 
+wait_for_dialog_subshell() {
+  if [[ -n "${DIALOG_SUBSHELL_PID:-}" ]]; then
+    log "info" "Waiting for Swift Dialog subshell (PID $DIALOG_SUBSHELL_PID) to exit..."
+    wait "$DIALOG_SUBSHELL_PID"
+    log "info" "Swift Dialog subshell has exited."
+  else
+    log "warning" "No Swift Dialog subshell PID found to wait for."
+  fi
+}
+
 finalize_onboarding() {
   # Processes config and signals completion in SwiftDialog
   log "info" "All application monitoring jobs finished."
@@ -269,6 +280,7 @@ launch_dialog
 parse_config
 finalize_onboarding
 wait_for_dialog_exit
+wait_for_dialog_subshell
 log "info" "Finished Setup. Exiting cleanly."
 
 exit 0

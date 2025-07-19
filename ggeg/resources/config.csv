@@ -14,4 +14,4 @@
 Company Portal,any,.*/preinstall:.*Company Portal;.*Company Portal with old bundle ID,any,.*Touched bundle /Applications/Company Portal.app
 
 # Microsoft Office 365: Looks for OneDrive.pkg extraction or Word install as start; finishes when all main apps are touched
-Microsoft Office 365,any,.*Microsoft Word.*\\.pkg.*install.*;.*OneDrive.*\\.pkg.*install.*,all,.*Touched bundle /Applications/Microsoft Word.app;.*Touched bundle /Applications/Microsoft Excel.app;.*Touched bundle /Applications/Microsoft PowerPoint.app;.*Touched bundle /Applications/Microsoft OneNote.app;.*Touched bundle /Applications/Microsoft Outlook.app;.*Touched bundle /Applications/Microsoft Teams.app;.*Touched bundle /Applications/OneDrive.app
+Microsoft Office 365,any,.*Microsoft_365.*,all,.*Touched bundle /Applications/Microsoft Word.app;.*Touched bundle /Applications/Microsoft Excel.app;.*Touched bundle /Applications/Microsoft PowerPoint.app;.*Touched bundle /Applications/Microsoft OneNote.app;.*Touched bundle /Applications/Microsoft Outlook.app;.*Touched bundle /Applications/Microsoft Teams.app;.*Touched bundle /Applications/OneDrive.app
