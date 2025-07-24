@@ -10,7 +10,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 # for debugging
-#set -x
+set -x
 
 DEBUG="false"
 # Constants
@@ -96,58 +96,22 @@ launch_dialog() {
     blur_flags+=(--blurscreen --ontop)
   fi
 
-  while [ $attempt -le $MAX_ATTEMPTS ]; do
-    log "info" "Attempting to launch Swift Dialog (Attempt $attempt of $MAX_ATTEMPTS)"
-    killall Dialog >/dev/null 2>&1 || true
+  log "info" "Attempting to launch Swift Dialog (Attempt $attempt of $MAX_ATTEMPTS)"
+  killall Dialog >/dev/null 2>&1 || true
 
-    # Start Dialog in background and handle errors safely
-    {
-      log "info" "Launching Swift Dialog binary..."
-      "$DIALOG_BIN" \
-        "${blur_flags[@]:-}" \
-        --jsonfile "$DIALOG_CONFIG" \
-        --commandfile "$COMMAND_FILE" \
-        --presentation \
-        --messagealignment "left" \
-        --button1disabled \
-        --button2text "Reboot Now" \
-        --width 1280 --height 500
-
-      local exit_code=$?
-      log "info" "Swift Dialog exited with code $exit_code"
-
-      if [ "$exit_code" -eq 2 ]; then
-        log "info" "User clicked Reboot Now. Rebooting..."
-        if rm -f "$RESOURCE_DIR/$PROJECT_NAME.lock"; then
-          log "info" "$PROJECT_NAME.lock successfully removed."
-        else
-          log "warning" "Failed to remove dialog.lock. It may not exist or permission was denied."
-        fi
-        sleep 2
-        osascript -e 'tell app "System Events" to restart'
-      fi
-    } &
+  # Start Dialog in background and handle errors safely
+  log "info" "Launching Swift Dialog binary..."
+  "$DIALOG_BIN" \
+    "${blur_flags[@]:-}" \
+    --jsonfile "$DIALOG_CONFIG" \
+    --commandfile "$COMMAND_FILE" \
+    --presentation \
+    --messagealignment "left" \
+    --button1disabled \
+    --button2text "Reboot Now" \
+    --width 1280 --height 500 \
+    &
     DIALOG_SUBSHELL_PID=$!
-
-    for ((i = 1; i <= $DIALOG_TIMEOUT; i++)); do
-      dialog_pid="$(pgrep -x Dialog || true)"
-      if [ -n "$dialog_pid" ]; then
-        log "info" "Swift Dialog launched successfully on attempt $attempt with PID ${dialog_pid}."
-        touch "$RESOURCE_DIR/$PROJECT_NAME.lock"
-        caffeinate -dimsu -w "$dialog_pid" &
-        log "info" "Caffeinate started to prevent sleep while dialog is active"
-        sleep 10
-        return 0
-      fi
-      sleep 1
-    done
-
-    log "warning" "Swift Dialog did not launch within $DIALOG_TIMEOUT seconds on attempt $attempt."
-    attempt=$((attempt + 1))
-  done
-
-  log "error" "Swift Dialog failed to launch after $MAX_ATTEMPTS attempts. Continuing with the script..."
-  return 1
 }
 
 monitor_app() {
@@ -247,20 +211,22 @@ parse_config() {
   done
 }
 
-wait_for_dialog_exit() {
-  # Waits until SwiftDialog process has exited.
-  log "info" "Waiting for Swift Dialog process to exit..."
-  while [[ -n "$(pgrep -x Dialog 2>/dev/null || true)" ]]; do
-    sleep 1
-  done
-  log "info" "Swift Dialog process has exited."
-}
-
-wait_for_dialog_subshell() {
+wait_for_dialog() {
   if [[ -n "${DIALOG_SUBSHELL_PID:-}" ]]; then
     log "info" "Waiting for Swift Dialog subshell (PID $DIALOG_SUBSHELL_PID) to exit..."
     wait "$DIALOG_SUBSHELL_PID"
-    log "info" "Swift Dialog subshell has exited."
+    local dialog_exit_code=$?
+    log "info" "Swift Dialog exited with code $dialog_exit_code"    
+    if [ "$dialog_exit_code" -eq 2 ]; then
+      log "info" "User clicked Reboot Now. Rebooting..."
+      if rm -f "$RESOURCE_DIR/$PROJECT_NAME.lock"; then
+        log "info" "$PROJECT_NAME.lock successfully removed."
+      else
+        log "warning" "Failed to remove dialog.lock. It may not exist or permission was denied."
+      fi
+      sleep 2
+      /usr/bin/osascript -e 'tell app "System Events" to restart'
+    fi
   else
     log "warning" "No Swift Dialog subshell PID found to wait for."
   fi
@@ -284,8 +250,7 @@ wait_for_dock
 launch_dialog
 parse_config
 finalize_onboarding
-wait_for_dialog_exit
-wait_for_dialog_subshell
+wait_for_dialog
 log "info" "Finished Setup. Exiting cleanly."
 
 exit 0

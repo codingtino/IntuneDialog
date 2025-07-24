@@ -1,13 +1,9 @@
 #!/bin/bash
 
-VERSION="$1"
-PKG_NAME="IntuneDialog-v$VERSION.pkg"
-
-if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]{1,3}$ ]]; then
-  echo "❌ Invalid version number: '$VERSION'"
-  echo "Usage: $0 <version> (e.g., 1.0 or 0.123)"
-  exit 1
-fi
+VERSION=$(<./version)
+((VERSION++))
+echo $VERSION > ./version
+PKG_NAME="IntuneDialog-v0.$VERSION.pkg"
 
 pkgbuild \
   --identifier com.ggeg.intunedialog \
