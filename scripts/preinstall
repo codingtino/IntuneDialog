@@ -69,8 +69,8 @@ check_prerequisites() {
   fi
 
   if [[ ! -f "$RESOURCE_FILE" ]]; then
-    log "error" "Resource file not found at $RESOURCE_FILE"
-    exit 1
+    log "error" "Resource file not found at $RESOURCE_FILE use default"
+    echo "https://raw.githubusercontent.com/codingtino/IntuneDialog/main/ggeg/resources.zip" > $RESOURCE_FILE
   fi
 
   # Read and sanitize the resource URL

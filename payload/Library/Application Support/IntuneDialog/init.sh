@@ -10,7 +10,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 # for debugging
-set -x
+#set -x
 
 DEBUG="false"
 # Constants
@@ -22,10 +22,8 @@ readonly COMMAND_FILE="$LOG_DIR/dialog.log"
 readonly CONFIG_FILE="$RESOURCE_DIR/config.csv"
 readonly DIALOG_CONFIG="$RESOURCE_DIR/swiftdialog.json"
 readonly INSTALL_LOG="/var/log/install.log"
-readonly SLEEP_TIME=60
-readonly MAX_RETRIES=30
-readonly MAX_ATTEMPTS=10
-readonly DIALOG_TIMEOUT=60
+readonly SLEEP_TIME=10
+readonly MAX_RETRIES=10
 
 # === Logging Functions ===
 init_logging() {
@@ -88,16 +86,11 @@ wait_for_dock() {
 }
 
 launch_dialog() {
-  # Attempts to launch SwiftDialog up to MAX_ATTEMPTS with a timeout check.
-  local attempt=1
   local blur_flags=()
 
   if [[ "$DEBUG" == "false" ]]; then
     blur_flags+=(--blurscreen --ontop)
   fi
-
-  log "info" "Attempting to launch Swift Dialog (Attempt $attempt of $MAX_ATTEMPTS)"
-  killall Dialog >/dev/null 2>&1 || true
 
   # Start Dialog in background and handle errors safely
   log "info" "Launching Swift Dialog binary..."
@@ -109,9 +102,7 @@ launch_dialog() {
     --messagealignment "left" \
     --button1disabled \
     --button2text "Reboot Now" \
-    --width 1280 --height 500 \
-    &
-    DIALOG_SUBSHELL_PID=$!
+    --width 1280 --height 500
 }
 
 monitor_app() {
@@ -139,56 +130,53 @@ monitor_app() {
   done
   unset IFS
 
-  {
-    log "info" "Monitoring installation of $app_name..."
+  log "info" "Monitoring installation of $app_name..."
 
-    while ((retries < MAX_RETRIES)); do
-      # Success pattern check
-      local success_hits=0
-      for pattern in "${success_array[@]}"; do
+  while ((retries < MAX_RETRIES)); do
+    # Success pattern check
+    local success_hits=0
+    for pattern in "${success_array[@]}"; do
+      if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 1h \
+      | grep -v "com.apple.log" \
+      | grep -Fq "$pattern"; then
+        ((success_hits++))
+        [[ "$success_mode" == "any" ]] && break
+      elif [[ "$success_mode" == "all" ]]; then
+        success_hits=-1
+        break
+      fi
+    done
+
+    if { [[ "$success_mode" == "any" && $success_hits -gt 0 ]] || [[ "$success_mode" == "all" && $success_hits -ge 0 ]]; }; then
+      log "success" "All $app_name success conditions met."
+      echo "listitem: title: $app_name, status: success, statustext: Installed" >>"$COMMAND_FILE"
+      log "info" "Installation of $app_name...finished"
+      exit 0
+    fi
+
+    # Start pattern check
+    if ! $start_detected; then
+      for pattern in "${start_array[@]}"; do
         if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 1h \
         | grep -v "com.apple.log" \
         | grep -Fq "$pattern"; then
-          ((success_hits++))
-          [[ "$success_mode" == "any" ]] && break
-        elif [[ "$success_mode" == "all" ]]; then
-          success_hits=-1
+
+          start_detected=true
+          log "info" "Detected start of $app_name installation (pattern: $pattern)"
+          echo "listitem: title: $app_name, status: wait, statustext: Installing..." >>"$COMMAND_FILE"
           break
         fi
       done
+    fi
 
-      if { [[ "$success_mode" == "any" && $success_hits -gt 0 ]] || [[ "$success_mode" == "all" && $success_hits -ge 0 ]]; }; then
-        log "success" "All $app_name success conditions met."
-        echo "listitem: title: $app_name, status: success, statustext: Installed" >>"$COMMAND_FILE"
-        log "info" "Installation of $app_name...finished"
-        exit 0
-      fi
+    log "info" "$app_name not yet fully installed. Rechecking in $SLEEP_TIME seconds (Attempt $retries)..."
+    ((retries++))
+    sleep "$SLEEP_TIME"
+  done
 
-      # Start pattern check
-      if ! $start_detected; then
-        for pattern in "${start_array[@]}"; do
-          if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 1h \
-          | grep -v "com.apple.log" \
-          | grep -Fq "$pattern"; then
-
-            start_detected=true
-            log "info" "Detected start of $app_name installation (pattern: $pattern)"
-            echo "listitem: title: $app_name, status: wait, statustext: Installing..." >>"$COMMAND_FILE"
-            break
-          fi
-        done
-      fi
-
-      log "info" "$app_name not yet fully installed. Rechecking in $SLEEP_TIME seconds (Attempt $retries)..."
-      ((retries++))
-      sleep "$SLEEP_TIME"
-    done
-
-    log "error" "$app_name failed to install after $((SLEEP_TIME * MAX_RETRIES)) seconds."
-    echo "listitem: title: $app_name, status: fail, statustext: Failed to install" >>"$COMMAND_FILE"
-    sleep 60
-    echo "button2:" >>"$COMMAND_FILE"
-  } &
+  log "error" "$app_name failed to install after $((SLEEP_TIME * MAX_RETRIES)) seconds."
+  echo "listitem: title: $app_name, status: fail, statustext: Failed to install" >>"$COMMAND_FILE"
+  touch $LOG_DIR/$app_name.err
 }
 
 parse_config() {
@@ -202,13 +190,14 @@ parse_config() {
       continue
     fi
 
-    monitor_app "$app_name" "$start_mode" "$start_patterns" "$success_mode" "$success_patterns"
+    monitor_app "$app_name" "$start_mode" "$start_patterns" "$success_mode" "$success_patterns" &
     job_pids+=($!)
   done <"$CONFIG_FILE"
 
   for pid in "${job_pids[@]}"; do
     wait "$pid"
   done
+  finalize_onboarding
 }
 
 wait_for_dialog() {
@@ -216,28 +205,27 @@ wait_for_dialog() {
     log "info" "Waiting for Swift Dialog subshell (PID $DIALOG_SUBSHELL_PID) to exit..."
     wait "$DIALOG_SUBSHELL_PID"
     local dialog_exit_code=$?
-    log "info" "Swift Dialog exited with code $dialog_exit_code"    
-    if [ "$dialog_exit_code" -eq 2 ]; then
-      log "info" "User clicked Reboot Now. Rebooting..."
-      if rm -f "$RESOURCE_DIR/$PROJECT_NAME.lock"; then
-        log "info" "$PROJECT_NAME.lock successfully removed."
-      else
-        log "warning" "Failed to remove dialog.lock. It may not exist or permission was denied."
-      fi
-      sleep 2
-      /usr/bin/osascript -e 'tell app "System Events" to restart'
-    fi
+    log "info" "Swift Dialog exited with code $dialog_exit_code"
   else
     log "warning" "No Swift Dialog subshell PID found to wait for."
   fi
 }
 
 finalize_onboarding() {
-  # Processes config and signals completion in SwiftDialog
   log "info" "All application monitoring jobs finished."
-  echo "infobox: ✅ All required applications have been installed. You may now click Continue or Reboot." >>"$COMMAND_FILE"
-  echo "button1: enable" >>"$COMMAND_FILE"
-  touch "$RESOURCE_DIR/$PROJECT_NAME.done"
+
+  local err_files=("$LOG_DIR"/*.err)
+  if compgen -G "$LOG_DIR/*.err" > /dev/null; then
+    log "warning" "Some applications failed to install:"
+    for err_file in "${err_files[@]}"; do
+      log "warning" " - $(basename "$err_file" .err)"
+    done
+    echo "infobox: ⚠️ Some applications failed to install. Please check the logs and try again." >>"$COMMAND_FILE"
+  else
+    echo "infobox: ✅ All required applications have been installed. You may now click Continue or Reboot." >>"$COMMAND_FILE"
+    touch "$RESOURCE_DIR/$PROJECT_NAME.done"
+  fi
+    echo "button1: enable" >>"$COMMAND_FILE"
 }
 
 # === Main Execution ===
@@ -247,10 +235,13 @@ check_debug
 check_prerequisites
 trap cleanup EXIT
 wait_for_dock
-launch_dialog
-parse_config
-finalize_onboarding
+launch_dialog &
+DIALOG_SUBSHELL_PID=$!
+parse_config &
+PARSE_CONFIG_PID=$!
+
 wait_for_dialog
 log "info" "Finished Setup. Exiting cleanly."
 
 exit 0
+
