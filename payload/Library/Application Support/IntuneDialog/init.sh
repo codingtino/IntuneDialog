@@ -22,8 +22,9 @@ readonly COMMAND_FILE="$LOG_DIR/dialog.log"
 readonly CONFIG_FILE="$RESOURCE_DIR/config.csv"
 readonly DIALOG_CONFIG="$RESOURCE_DIR/swiftdialog.json"
 readonly INSTALL_LOG="/var/log/install.log"
-readonly SLEEP_TIME=10
-readonly MAX_RETRIES=10
+readonly ITEMS_COUNT=$(($(grep -c '"title"' "$DIALOG_CONFIG")-1))
+readonly SLEEP_TIME=20
+readonly MAX_RETRIES=20
 
 # === Logging Functions ===
 init_logging() {
@@ -99,9 +100,9 @@ launch_dialog() {
     --jsonfile "$DIALOG_CONFIG" \
     --commandfile "$COMMAND_FILE" \
     --presentation \
+    --progress "$ITEMS_COUNT" \
     --messagealignment "left" \
     --button1disabled \
-    --button2text "Reboot Now" \
     --width 1280 --height 500
 }
 
@@ -116,8 +117,6 @@ monitor_app() {
   local retries=0
   init_logging "$app_log"
 
-  #  IFS=';' read -r -a start_array <<<"$(echo "$start_patterns" | sed 's/^;*//;s/;*$//')"
-  #  IFS=';' read -r -a success_array <<<"$(echo "$success_patterns" | sed 's/^;*//;s/;*$//')"
   start_array=()
   IFS=';'
   for token in $start_patterns; do
@@ -150,6 +149,7 @@ monitor_app() {
     if { [[ "$success_mode" == "any" && $success_hits -gt 0 ]] || [[ "$success_mode" == "all" && $success_hits -ge 0 ]]; }; then
       log "success" "All $app_name success conditions met."
       echo "listitem: title: $app_name, status: success, statustext: Installed" >>"$COMMAND_FILE"
+      echo "progress: increment" >>"$COMMAND_FILE"
       log "info" "Installation of $app_name...finished"
       exit 0
     fi
@@ -176,12 +176,13 @@ monitor_app() {
 
   log "error" "$app_name failed to install after $((SLEEP_TIME * MAX_RETRIES)) seconds."
   echo "listitem: title: $app_name, status: fail, statustext: Failed to install" >>"$COMMAND_FILE"
-  touch $LOG_DIR/$app_name.err
+  touch "$LOG_DIR/$app_name.fail"
 }
 
 parse_config() {
   log "info" "Processing scripts..."
   local job_pids=()
+  local app_count=0
   while IFS=',' read -r app_name start_mode start_patterns success_mode success_patterns; do
     [[ -z "${app_name:-}" || "${app_name:0:1}" == "#" ]] && continue
 
@@ -192,7 +193,14 @@ parse_config() {
 
     monitor_app "$app_name" "$start_mode" "$start_patterns" "$success_mode" "$success_patterns" &
     job_pids+=($!)
+    ((app_count++))
   done <"$CONFIG_FILE"
+
+  # Check if number of jobs matches ITEMS_COUNT
+  if (( ${#job_pids[@]} != ITEMS_COUNT )); then
+    log "error" "Config mismatch: Found ${#job_pids[@]} valid config entries, but dialog expects $ITEMS_COUNT items."
+    echo "infobox: ⚠️ Config error: Only ${#job_pids[@]} of $ITEMS_COUNT apps are configured. Please review config.csv." >>"$COMMAND_FILE"
+  fi
 
   for pid in "${job_pids[@]}"; do
     wait "$pid"
@@ -203,6 +211,9 @@ parse_config() {
 wait_for_dialog() {
   if [[ -n "${DIALOG_SUBSHELL_PID:-}" ]]; then
     log "info" "Waiting for Swift Dialog subshell (PID $DIALOG_SUBSHELL_PID) to exit..."
+    touch "$RESOURCE_DIR/$PROJECT_NAME.lock"
+    caffeinate -dimsu -w "$DIALOG_SUBSHELL_PID" &
+    log "info" "Caffeinate started to prevent sleep while dialog is active"
     wait "$DIALOG_SUBSHELL_PID"
     local dialog_exit_code=$?
     log "info" "Swift Dialog exited with code $dialog_exit_code"
@@ -214,15 +225,16 @@ wait_for_dialog() {
 finalize_onboarding() {
   log "info" "All application monitoring jobs finished."
 
-  local err_files=("$LOG_DIR"/*.err)
-  if compgen -G "$LOG_DIR/*.err" > /dev/null; then
+  local err_files=("$LOG_DIR"/*.fail)
+  if compgen -G "$LOG_DIR/*.fail" > /dev/null; then
     log "warning" "Some applications failed to install:"
     for err_file in "${err_files[@]}"; do
-      log "warning" " - $(basename "$err_file" .err)"
+      log "warning" " - $(basename "$err_file" .fail)"
     done
     echo "infobox: ⚠️ Some applications failed to install. Please check the logs and try again." >>"$COMMAND_FILE"
   else
     echo "infobox: ✅ All required applications have been installed. You may now click Continue or Reboot." >>"$COMMAND_FILE"
+    echo "progress: complete" >>"$COMMAND_FILE"
     touch "$RESOURCE_DIR/$PROJECT_NAME.done"
   fi
     echo "button1: enable" >>"$COMMAND_FILE"
