@@ -24,7 +24,7 @@ readonly DIALOG_CONFIG="$RESOURCE_DIR/swiftdialog.json"
 readonly INSTALL_LOG="/var/log/install.log"
 readonly ITEMS_COUNT=$(($(grep -c '"title"' "$DIALOG_CONFIG")-1))
 readonly SLEEP_TIME=20
-readonly MAX_RETRIES=20
+readonly MAX_RETRIES=30
 
 # === Logging Functions ===
 init_logging() {
@@ -88,6 +88,7 @@ wait_for_dock() {
 
 launch_dialog() {
   local blur_flags=()
+  local retries=6
 
   if [[ "$DEBUG" == "false" ]]; then
     blur_flags+=(--blurscreen --ontop)
@@ -103,7 +104,23 @@ launch_dialog() {
     --progress "$ITEMS_COUNT" \
     --messagealignment "left" \
     --button1disabled \
-    --width 1280 --height 500
+    --width 1280 --height 500 \
+    &
+  readonly DIALOG_SUBSHELL_PID=$!
+
+  while ! pgrep -f "Swift Dialog" >/dev/null && (( retries-- > 0 )); do
+    log "info" "wait for Swift Dialog being operational..."
+    sleep 10
+  done
+  if (( retries == 0 )); then
+    log "error" "Swift Dialog did not start after waiting. Exiting."
+    exit 1
+  else
+    touch "$RESOURCE_DIR/$PROJECT_NAME.lock"
+    caffeinate -dimsu -w "$DIALOG_SUBSHELL_PID" &
+    log "info" "Caffeinate started to prevent sleep while dialog is active"
+  fi
+
 }
 
 monitor_app() {
@@ -179,10 +196,9 @@ monitor_app() {
   touch "$LOG_DIR/$app_name.fail"
 }
 
-parse_config() {
+wait_for_app_install() {
   log "info" "Processing scripts..."
-  local job_pids=()
-  local app_count=0
+  local app_monitor_pids=()
   while IFS=',' read -r app_name start_mode start_patterns success_mode success_patterns; do
     [[ -z "${app_name:-}" || "${app_name:0:1}" == "#" ]] && continue
 
@@ -192,38 +208,19 @@ parse_config() {
     fi
 
     monitor_app "$app_name" "$start_mode" "$start_patterns" "$success_mode" "$success_patterns" &
-    job_pids+=($!)
-    ((app_count++))
+    app_monitor_pids+=($!)
   done <"$CONFIG_FILE"
 
-  # Check if number of jobs matches ITEMS_COUNT
-  if (( ${#job_pids[@]} != ITEMS_COUNT )); then
-    log "error" "Config mismatch: Found ${#job_pids[@]} valid config entries, but dialog expects $ITEMS_COUNT items."
-    echo "infobox: ⚠️ Config error: Only ${#job_pids[@]} of $ITEMS_COUNT apps are configured. Please review config.csv." >>"$COMMAND_FILE"
+  
+  if (( ${#app_monitor_pids[@]} != ITEMS_COUNT )); then
+    log "error" "Config mismatch: Found ${#app_monitor_pids[@]} valid config entries, but dialog expects $ITEMS_COUNT items."
+    echo "infobox: ❌ Config error: Only ${#app_monitor_pids[@]} of $ITEMS_COUNT apps are configured. Please review config.csv." >>"$COMMAND_FILE"
   fi
 
-  for pid in "${job_pids[@]}"; do
+  for pid in "${app_monitor_pids[@]}"; do
     wait "$pid"
   done
-  finalize_onboarding
-}
-
-wait_for_dialog() {
-  if [[ -n "${DIALOG_SUBSHELL_PID:-}" ]]; then
-    log "info" "Waiting for Swift Dialog subshell (PID $DIALOG_SUBSHELL_PID) to exit..."
-    touch "$RESOURCE_DIR/$PROJECT_NAME.lock"
-    caffeinate -dimsu -w "$DIALOG_SUBSHELL_PID" &
-    log "info" "Caffeinate started to prevent sleep while dialog is active"
-    wait "$DIALOG_SUBSHELL_PID"
-    local dialog_exit_code=$?
-    log "info" "Swift Dialog exited with code $dialog_exit_code"
-  else
-    log "warning" "No Swift Dialog subshell PID found to wait for."
-  fi
-}
-
-finalize_onboarding() {
-  log "info" "All application monitoring jobs finished."
+    log "info" "All application monitoring jobs finished."
 
   local err_files=("$LOG_DIR"/*.fail)
   if compgen -G "$LOG_DIR/*.fail" > /dev/null; then
@@ -232,12 +229,22 @@ finalize_onboarding() {
       log "warning" " - $(basename "$err_file" .fail)"
     done
     echo "infobox: ⚠️ Some applications failed to install. Please check the logs and try again." >>"$COMMAND_FILE"
-  else
+  elif (( ${#app_monitor_pids[@]} == ITEMS_COUNT )); then
     echo "infobox: ✅ All required applications have been installed. You may now click Continue or Reboot." >>"$COMMAND_FILE"
     echo "progress: complete" >>"$COMMAND_FILE"
     touch "$RESOURCE_DIR/$PROJECT_NAME.done"
   fi
-    echo "button1: enable" >>"$COMMAND_FILE"
+  echo "button1: enable" >>"$COMMAND_FILE"
+
+}
+
+wait_for_dialog() {
+  if [[ -n "${DIALOG_SUBSHELL_PID:-}" ]]; then
+    log "info" "Waiting for Swift Dialog subshell (PID $DIALOG_SUBSHELL_PID) to exit..."
+    wait "$DIALOG_SUBSHELL_PID"
+  else
+    log "warning" "No Swift Dialog subshell PID found to wait for."
+  fi
 }
 
 # === Main Execution ===
@@ -247,11 +254,8 @@ check_debug
 check_prerequisites
 trap cleanup EXIT
 wait_for_dock
-launch_dialog &
-DIALOG_SUBSHELL_PID=$!
-parse_config &
-PARSE_CONFIG_PID=$!
-
+launch_dialog
+wait_for_app_install &
 wait_for_dialog
 log "info" "Finished Setup. Exiting cleanly."
 

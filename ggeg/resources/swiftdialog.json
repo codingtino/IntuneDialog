@@ -23,6 +23,12 @@
       "icon": "/Library/Application Support/IntuneDialog/images/MicrosoftEdge.png",
       "status": "pending",
       "statustext": "Pending"
+    },
+    {
+      "title": "Adobe Acrobat",
+      "icon": "/Library/Application Support/IntuneDialog/images/AdobeAcrobat.png",
+      "status": "pending",
+      "statustext": "Pending"
     }
   ]
 }

@@ -7,7 +7,7 @@ PKG_NAME="IntuneDialog-v0.$VERSION.pkg"
 
 pkgbuild \
   --identifier com.ggeg.intunedialog \
-  --version "$VERSION" \
+  --version "0.$VERSION" \
   --root ./payload \
   --scripts ./scripts \
   "./builds/$PKG_NAME"
