@@ -29,6 +29,12 @@
       "icon": "/Library/Application Support/IntuneDialog/images/AdobeAcrobat.png",
       "status": "pending",
       "statustext": "Pending"
+    },
+    {
+      "title": "Pascom",
+      "icon": "/Library/Application Support/IntuneDialog/images/Pascom.png",
+      "status": "pending",
+      "statustext": "Pending"
     }
   ]
 }
