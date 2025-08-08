@@ -23,8 +23,8 @@ readonly CONFIG_FILE="$RESOURCE_DIR/config.csv"
 readonly DIALOG_CONFIG="$RESOURCE_DIR/swiftdialog.json"
 readonly INSTALL_LOG="/var/log/install.log"
 readonly ITEMS_COUNT=$(($(grep -c '"title"' "$DIALOG_CONFIG")-1))
-readonly SLEEP_TIME=20
-readonly MAX_RETRIES=30
+readonly SLEEP_TIME=60
+readonly MAX_RETRIES=60
 
 # === Logging Functions ===
 init_logging() {
@@ -152,7 +152,7 @@ monitor_app() {
     # Success pattern check
     local success_hits=0
     for pattern in "${success_array[@]}"; do
-      if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 1h \
+      if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 7d \
       | grep -v "com.apple.log" \
       | grep -Fq "$pattern"; then
         ((success_hits++))
@@ -174,7 +174,7 @@ monitor_app() {
     # Start pattern check
     if ! $start_detected; then
       for pattern in "${start_array[@]}"; do
-        if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 1h \
+        if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 7d \
         | grep -v "com.apple.log" \
         | grep -Fq "$pattern"; then
 
