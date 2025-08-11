@@ -43,7 +43,7 @@ log() {
 
 cleanup() {
   # Deletes the lock file and logs the cleanup step.
-  rm -f "$RESOURCE_DIR/$PROJECT_NAME.lock"
+  rm -f "$RESOURCE_DIR/$PROJECT_NAME.lock" "$LOG_DIR/*.fail"
   log "info" "Cleanup completed."
 }
 
@@ -148,6 +148,21 @@ monitor_app() {
 
   log "info" "Monitoring installation of $app_name..."
 
+  # Local function to centralize success handling (avoid duplication)
+  handle_success() {
+    log "success" "All $app_name success conditions met."
+    echo "listitem: title: $app_name, status: success, statustext: Installed" >>"$COMMAND_FILE"
+    echo "progress: increment" >>"$COMMAND_FILE"
+    touch "$LOG_DIR/$app_name.success"
+    log "info" "Installation of $app_name...finished"
+    exit 0
+  }
+
+  # If success marker already exists, skip checks
+  if [[ -f "$LOG_DIR/$app_name.success" ]]; then
+    handle_success
+  fi
+
   while ((retries < MAX_RETRIES)); do
     # Success pattern check
     local success_hits=0
@@ -164,11 +179,7 @@ monitor_app() {
     done
 
     if { [[ "$success_mode" == "any" && $success_hits -gt 0 ]] || [[ "$success_mode" == "all" && $success_hits -ge 0 ]]; }; then
-      log "success" "All $app_name success conditions met."
-      echo "listitem: title: $app_name, status: success, statustext: Installed" >>"$COMMAND_FILE"
-      echo "progress: increment" >>"$COMMAND_FILE"
-      log "info" "Installation of $app_name...finished"
-      exit 0
+      handle_success
     fi
 
     # Start pattern check
@@ -249,7 +260,7 @@ wait_for_dialog() {
 
 # === Main Execution ===
 init_logging
-log "info" "Starting onboarding script..."
+log "info" "Starting IntuneDialog script..."
 check_debug
 check_prerequisites
 trap cleanup EXIT
