@@ -45,6 +45,12 @@ cleanup() {
   # Deletes the lock file and logs the cleanup step.
   rm -f "$RESOURCE_DIR/$PROJECT_NAME.lock" "$LOG_DIR/*.fail"
   log "info" "Cleanup completed."
+  if [[ "$DEBUG" == "false" ]]; then
+    log "info" "Rebooting system..."
+    /sbin/shutdown -r now
+  else
+    log "info" "Skipping reboot in DEBUG mode."
+  fi
 }
 
 check_debug() {
