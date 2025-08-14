@@ -110,6 +110,7 @@ launch_dialog() {
     --progress "$ITEMS_COUNT" \
     --messagealignment "left" \
     --button1disabled \
+    --button2text "Reboot Now" \
     --width 1280 --height 500 \
     &
   readonly DIALOG_SUBSHELL_PID=$!
