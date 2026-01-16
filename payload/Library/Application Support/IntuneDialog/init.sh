@@ -22,7 +22,7 @@ readonly COMMAND_FILE="$LOG_DIR/dialog.log"
 readonly CONFIG_FILE="$RESOURCE_DIR/config.csv"
 readonly DIALOG_CONFIG="$RESOURCE_DIR/swiftdialog.json"
 readonly INSTALL_LOG="/var/log/install.log"
-readonly ITEMS_COUNT=$(($(grep -c '"title"' "$DIALOG_CONFIG")-1))
+readonly ITEMS_COUNT=$(($(grep -c '"title"' "$DIALOG_CONFIG") - 1))
 readonly SLEEP_TIME=60
 readonly MAX_RETRIES=60
 
@@ -43,11 +43,13 @@ log() {
 
 cleanup() {
   # Deletes the lock file and logs the cleanup step.
-  rm -f "$RESOURCE_DIR/$PROJECT_NAME.lock" "$LOG_DIR/*.fail"
+  shopt -s nullglob nocaseglob
+  rm -f -- "$RESOURCE_DIR/$PROJECT_NAME.lock" "$LOG_DIR"/*.fail
+  shopt -u nullglob nocaseglob
   log "info" "Cleanup completed."
   if [[ "$DEBUG" == "false" ]]; then
     log "info" "Rebooting system..."
-    /sbin/shutdown -r now
+    #    /sbin/shutdown -r now
   else
     log "info" "Skipping reboot in DEBUG mode."
   fi
@@ -115,11 +117,11 @@ launch_dialog() {
     &
   readonly DIALOG_SUBSHELL_PID=$!
 
-  while ! pgrep -f "Swift Dialog" >/dev/null && (( retries-- > 0 )); do
+  while ! pgrep -f "Swift Dialog" >/dev/null && ((retries-- > 0)); do
     log "info" "wait for Swift Dialog being operational..."
     sleep 10
   done
-  if (( retries == 0 )); then
+  if ((retries == 0)); then
     log "error" "Swift Dialog did not start after waiting. Exiting."
     exit 1
   else
@@ -174,9 +176,9 @@ monitor_app() {
     # Success pattern check
     local success_hits=0
     for pattern in "${success_array[@]}"; do
-      if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 7d \
-      | grep -v "com.apple.log" \
-      | grep -Fq "$pattern"; then
+      if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 7d |
+        grep -v "com.apple.log" |
+        grep -Fq "$pattern"; then
         ((success_hits++))
         [[ "$success_mode" == "any" ]] && break
       elif [[ "$success_mode" == "all" ]]; then
@@ -192,9 +194,9 @@ monitor_app() {
     # Start pattern check
     if ! $start_detected; then
       for pattern in "${start_array[@]}"; do
-        if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 7d \
-        | grep -v "com.apple.log" \
-        | grep -Fq "$pattern"; then
+        if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 7d |
+          grep -v "com.apple.log" |
+          grep -Fq "$pattern"; then
 
           start_detected=true
           log "info" "Detected start of $app_name installation (pattern: $pattern)"
@@ -229,8 +231,7 @@ wait_for_app_install() {
     app_monitor_pids+=($!)
   done <"$CONFIG_FILE"
 
-  
-  if (( ${#app_monitor_pids[@]} != ITEMS_COUNT )); then
+  if ((${#app_monitor_pids[@]} != ITEMS_COUNT)); then
     log "error" "Config mismatch: Found ${#app_monitor_pids[@]} valid config entries, but dialog expects $ITEMS_COUNT items."
     echo "infobox: ❌ Config error: Only ${#app_monitor_pids[@]} of $ITEMS_COUNT apps are configured. Please review config.csv." >>"$COMMAND_FILE"
   fi
@@ -238,16 +239,16 @@ wait_for_app_install() {
   for pid in "${app_monitor_pids[@]}"; do
     wait "$pid"
   done
-    log "info" "All application monitoring jobs finished."
+  log "info" "All application monitoring jobs finished."
 
   local err_files=("$LOG_DIR"/*.fail)
-  if compgen -G "$LOG_DIR/*.fail" > /dev/null; then
+  if compgen -G "$LOG_DIR/*.fail" >/dev/null; then
     log "warning" "Some applications failed to install:"
     for err_file in "${err_files[@]}"; do
       log "warning" " - $(basename "$err_file" .fail)"
     done
     echo "infobox: ⚠️ Some applications failed to install. Please check the logs and try again." >>"$COMMAND_FILE"
-  elif (( ${#app_monitor_pids[@]} == ITEMS_COUNT )); then
+  elif ((${#app_monitor_pids[@]} == ITEMS_COUNT)); then
     echo "infobox: ✅ All required applications have been installed. You may now click Continue or Reboot." >>"$COMMAND_FILE"
     echo "progress: complete" >>"$COMMAND_FILE"
     touch "$RESOURCE_DIR/$PROJECT_NAME.done"
@@ -278,4 +279,3 @@ wait_for_dialog
 log "info" "Finished Setup. Exiting cleanly."
 
 exit 0
-
