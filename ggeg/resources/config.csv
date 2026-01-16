@@ -11,8 +11,8 @@
 # - The monitoring script supports parallel checks and retries
 
 
-Company Portal,any,/Applications/Company Portal.app,any,com.apple.extensiblesso
-Microsoft Office 365,any,Microsoft_365,any,Application was installed at: file:///Applications/Microsoft%20Word.app
-Microsoft Edge,any,MicrosoftEdge,any,Application was installed at: file:///Applications/Microsoft%20Edge.app
-Adobe Acrobat,any,adobe,any,Adobe Acrobat (Continuous)
-Pascom,any,pascom,any,UUID cache miss for net.pascom.pascomClient
+Company Portal,any,Install bundle 'com.microsoft.CompanyPortalMac' ==> Applications/Company Portal.app,all,Registering managed app for Microsoft.Profiles.MDM ==> <UManagedAppInfo: com.microsoft.CompanyPortalMac;Installed configuration profile: com.apple.extensiblesso Profile
+Microsoft Office 365,any,com.microsoft.officeSuite,any,Application was installed at: file:///Applications/Microsoft%20Word.app/
+Microsoft Edge,any,com.microsoft.edgemac,any,Application was installed at: file:///Applications/Microsoft%20Edge.app/
+Adobe Acrobat,any,hfs: mounted Acrobat on device,any,com.adobe.Acrobat.Pro/Unknown Persona:5:5:2:1:Built bundle record for app
+Pascom,any,hfs: mounted pascom Client on device,any,net.pascom.pascomClient/Unknown Persona:5:5:2:1:Built bundle record for app
