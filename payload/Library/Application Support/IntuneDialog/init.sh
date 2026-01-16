@@ -49,7 +49,7 @@ cleanup() {
   log "info" "Cleanup completed."
   if [[ "$DEBUG" == "false" ]]; then
     log "info" "Rebooting system..."
-    #    /sbin/shutdown -r now
+    /sbin/shutdown -r now
   else
     log "info" "Skipping reboot in DEBUG mode."
   fi
@@ -176,7 +176,7 @@ monitor_app() {
     # Success pattern check
     local success_hits=0
     for pattern in "${success_array[@]}"; do
-      if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 7d |
+      if /usr/bin/log show --predicate "composedMessage contains[c] \"$pattern\"" --last 7d |
         grep -v "com.apple.log" |
         grep -Fq "$pattern"; then
         ((success_hits++))
@@ -194,7 +194,7 @@ monitor_app() {
     # Start pattern check
     if ! $start_detected; then
       for pattern in "${start_array[@]}"; do
-        if /usr/bin/log show --predicate "eventMessage contains[c] \"$pattern\"" --last 7d |
+        if /usr/bin/log show --predicate "composedMessage contains[c] \"$pattern\"" --last 7d |
           grep -v "com.apple.log" |
           grep -Fq "$pattern"; then
 
