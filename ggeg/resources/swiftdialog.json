@@ -35,6 +35,18 @@
       "icon": "/Library/Application Support/IntuneDialog/images/Pascom.png",
       "status": "pending",
       "statustext": "Pending"
+    },
+    {
+      "title": "uniFLOW SmartClient",
+      "icon": "/Library/Application Support/IntuneDialog/images/Pascom.png",
+      "status": "pending",
+      "statustext": "Pending"
+    },
+    {
+      "title": "ConnectWise Control",
+      "icon": "/Library/Application Support/IntuneDialog/images/Pascom.png",
+      "status": "pending",
+      "statustext": "Pending"
     }
   ]
 }

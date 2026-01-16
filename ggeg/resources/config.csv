@@ -16,3 +16,5 @@ Microsoft Office 365,any,com.microsoft.officeSuite,any,Application was installed
 Microsoft Edge,any,com.microsoft.edgemac,any,Application was installed at: file:///Applications/Microsoft%20Edge.app/
 Adobe Acrobat,any,hfs: mounted Acrobat on device,any,com.adobe.Acrobat.Pro/Unknown Persona:5:5:2:1:Built bundle record for app
 Pascom,any,hfs: mounted pascom Client on device,any,net.pascom.pascomClient/Unknown Persona:5:5:2:1:Built bundle record for app
+uniFLOW SmartClient,any,registering /Applications/uniFLOW SmartClient.app for UID,any,com.nt-ware.SmartClient/Unknown Persona:5:5:2:1:Built bundle record for app
+ConnectWise Control,any,registering /Applications/connectwisecontrol-,any,com.screenconnect.client.access/Unknown Persona:5:5:2:1:Built bundle record for app
