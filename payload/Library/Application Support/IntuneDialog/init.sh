@@ -113,6 +113,7 @@ launch_dialog() {
     --messagealignment "left" \
     --button1disabled \
     --button2text "Reboot Now" \
+    --button2action "/sbin/shutdown -r now" \
     --width 1280 --height 500 \
     &
   readonly DIALOG_SUBSHELL_PID=$!
