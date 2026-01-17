@@ -111,9 +111,7 @@ launch_dialog() {
     --presentation \
     --progress "$ITEMS_COUNT" \
     --messagealignment "left" \
-    --button1disabled \
-    --button2text "Reboot Now" \
-    --button2action "/sbin/shutdown -r now" \
+    --button1text "Reboot Now" \
     --width 1280 --height 500 \
     &
   readonly DIALOG_SUBSHELL_PID=$!
@@ -253,8 +251,9 @@ wait_for_app_install() {
     echo "infobox: ✅ All required applications have been installed. You may now click Continue or Reboot." >>"$COMMAND_FILE"
     echo "progress: complete" >>"$COMMAND_FILE"
     touch "$RESOURCE_DIR/$PROJECT_NAME.done"
+    echo "button1text: Reboot & Exit" >>"$COMMAND_FILE"
+    echo "button1: enable" >>"$COMMAND_FILE"
   fi
-  echo "button1: enable" >>"$COMMAND_FILE"
 
 }
 

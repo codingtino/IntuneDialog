@@ -4,7 +4,6 @@
   "iconsize": 400,
   "infobox": "Finalizing your Mac configuration.<br>This may take several minutes.<br>Ensure the device remains connected to power and do not close the lid or restart.",
   "backgroundcolor": "#123123",
-  "button1text": "Exit",
   "listitem": [
     {
       "title": "Company Portal",
