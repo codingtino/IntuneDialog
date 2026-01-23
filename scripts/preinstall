@@ -1,0 +1,151 @@
+#!/bin/bash
+
+# -----------------------------------------------------------------------------
+# Script Name: preinstall
+# Description: Downloads and prepares necessary resources
+# Author: Tino Naumann
+# Created: 2025-05-17
+# -----------------------------------------------------------------------------
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# Constants
+readonly PROJECT_NAME="IntuneDialog"
+readonly RESOURCE_DIR="/Library/Application Support/$PROJECT_NAME"
+readonly LOG_DIR="/Library/Logs/$PROJECT_NAME"
+readonly WORK_DIR="$(mktemp -d)"
+readonly RESOURCE_FILE="/var/tmp/${PROJECT_NAME}_resource.url"
+readonly DIALOG_PKG_URL="https://github.com/swiftDialog/swiftDialog/releases/download/v2.5.5/dialog-2.5.5-4802.pkg"
+readonly DIALOG_BINARY_PATH="/usr/local/bin/dialog"
+readonly RETRIES=3
+readonly RETRY_DELAY=5
+
+# === Logging Functions ===
+init_logging() {
+  # Initializes logging by redirecting stdout and stderr to a logfile.
+  local logfile="${1:-"$LOG_DIR/$(basename "${BASH_SOURCE[1]:-$0}" | cut -d '.' -f1).log"}"
+  mkdir -p "$(dirname "$logfile")"
+  exec > >(tee -a "$logfile") 2>&1
+}
+
+log() {
+  # Simple logging function with timestamp and log level.
+  local level="$1"
+  local message="$2"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') | $(echo "$level" | tr '[:lower:]' '[:upper:]') | $message"
+}
+
+cleanup() {
+  # Deletes the temporary work directory and logs the cleanup step.
+  rm -rf "$WORK_DIR"
+  log "info" "Cleanup completed."
+}
+
+# === Utility Functions ===
+retry_until_success() {
+  local cmd="$1"
+  local action="$2"
+  local attempt=1
+
+  until eval "$cmd"; do
+    log "warn" "$action attempt $attempt failed. Retrying..."
+    ((attempt++))
+    if ((attempt > RETRIES)); then
+      log "error" "$action failed after $RETRIES attempts."
+      exit 1
+    fi
+    sleep "$RETRY_DELAY"
+  done
+}
+
+# === Requirement Check ===
+check_prerequisites() {
+  # Verifies prerequisites before running the onboarding logic
+
+  if [[ -f "$RESOURCE_DIR/$PROJECT_NAME.installed" ]]; then
+    log "info" "We've already completed installation. Exiting."
+    exit 0
+  fi
+
+  if [[ ! -f "$RESOURCE_FILE" ]]; then
+    log "error" "Resource file not found at $RESOURCE_FILE use default"
+    echo "https://raw.githubusercontent.com/codingtino/IntuneDialog/main/ggeg/resources.zip" > $RESOURCE_FILE
+  fi
+
+  # Read and sanitize the resource URL
+  RESOURCE_ZIP="$(tr -d '\r' <"$RESOURCE_FILE" | xargs)"
+
+  # Validate it's not empty
+  if [[ -z "$RESOURCE_ZIP" ]]; then
+    log "error" "Resource URL is empty in $RESOURCE_FILE"
+    exit 1
+  fi
+
+  # Validate basic URL format
+  if [[ ! "$RESOURCE_ZIP" =~ ^https?://[a-zA-Z0-9./_-]+\.zip$ ]]; then
+    log "error" "Resource URL is invalid or not a .zip file: $RESOURCE_ZIP"
+    exit 1
+  fi
+
+  # Optional: Check if URL is reachable
+  if ! curl -Is --max-time 5 "$RESOURCE_ZIP" | grep -qE "^HTTP/[0-9.]+\s+200"; then
+    log "error" "Resource URL is not reachable: $RESOURCE_ZIP"
+    exit 1
+  fi
+}
+
+# === Download Utilities ===
+download_file() {
+  # Downloads a file from a given URL to a specified destination using curl.
+  local url="$1"
+  local destination="$2"
+
+  if curl --retry $RETRIES --retry-delay 5 --retry-connrefused -Lso "$destination" "$url"; then
+    log "info" "Successfully downloaded: $url"
+  else
+    log "error" "Failed to download: $url"
+    exit 1
+  fi
+}
+
+# === Dialog Installation ===
+install_dialog() {
+  # Installs SwiftDialog if not already present. Retries on failure.
+  if [[ ! -x "$DIALOG_BINARY_PATH" ]]; then
+    log "info" "SwiftDialog is not installed. Installing..."
+    download_file "$DIALOG_PKG_URL" "$WORK_DIR/dialog.pkg"
+
+    retry_until_success "sudo installer -pkg \"$WORK_DIR/dialog.pkg\" -target / >/dev/null" "SwiftDialog installation"
+
+    log "info" "SwiftDialog installed successfully."
+  else
+    log "info" "SwiftDialog is already installed."
+  fi
+}
+
+# === Resource Fetching ===
+fetch_resources() {
+  # Downloads the resource ZIP and extracts it to the resource directory.
+  log "info" "Downloading resources from: $RESOURCE_ZIP"
+  download_file "$RESOURCE_ZIP" "$WORK_DIR/resources.zip"
+
+  log "info" "Extracting zip archive to $RESOURCE_DIR..."
+  mkdir -p "$RESOURCE_DIR"
+
+  retry_until_success "unzip -q \"$WORK_DIR/resources.zip\" -d \"$RESOURCE_DIR\"" "Resource extraction"
+
+  log "info" "Resources extracted successfully to $RESOURCE_DIR."
+}
+
+# === Main Execution ===
+init_logging
+trap cleanup EXIT
+check_prerequisites
+log "info" "Starting installation..."
+
+install_dialog
+fetch_resources
+
+log "info" "Installation completed successfully."
+exit 0

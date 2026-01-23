@@ -1,0 +1,20 @@
+# AppName,StartMatchMode,StartPatterns,SuccessMatchMode,SuccessPatterns
+# 
+# This config is used to monitor application installations based on /var/log/install.log
+# - AppName: Must match the title in swiftdialog.json
+# - StartMatchMode and SuccessMatchMode: either "any" or "all"
+# - StartPatterns and SuccessPatterns: semicolon-separated regex strings
+#
+# Notes:
+# - Regexes are matched against install.log using grep -F
+# - Leading/trailing semicolons are allowed and stripped
+# - The monitoring script supports parallel checks and retries
+
+
+Company Portal,any,Install bundle 'com.microsoft.CompanyPortalMac' ==> Applications/Company Portal.app,all,Registering managed app for Microsoft.Profiles.MDM ==> <UManagedAppInfo: com.microsoft.CompanyPortalMac;Installed configuration profile: com.apple.extensiblesso Profile
+Microsoft Office 365,any,com.microsoft.officeSuite,any,Application was installed at: file:///Applications/Microsoft%20Word.app/
+Microsoft Edge,any,com.microsoft.edgemac,any,Application was installed at: file:///Applications/Microsoft%20Edge.app/
+Adobe Acrobat,any,hfs: mounted Acrobat on device,any,com.adobe.Acrobat.Pro/Unknown Persona:
+Pascom,any,hfs: mounted pascom Client on device,any,net.pascom.pascomClient/Unknown Persona:;hfs: mounted pascom Client on device
+uniFLOW SmartClient,any,registering /Applications/uniFLOW SmartClient.app for UID,any,com.nt-ware.SmartClient/Unknown Persona:
+ConnectWise Control,any,registering /Applications/connectwisecontrol-,any,com.screenconnect.client.access/Unknown Persona:

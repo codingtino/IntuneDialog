@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# -----------------------------------------------------------------------------
+# Script Name: postinstall
+# Description: enable autostart for IntuneDialog
+# Author: Tino Naumann
+# Created: 2025-05-17
+# -----------------------------------------------------------------------------
+
+set -euo pipefail
+IFS=$'\n\t'
+
+# Constants
+readonly PROJECT_NAME="IntuneDialog"
+readonly RESOURCE_DIR="/Library/Application Support/$PROJECT_NAME"
+readonly LOG_DIR="/Library/Logs/$PROJECT_NAME"
+readonly PLIST_PATH="/Library/LaunchDaemons/com.ggeg.intunedialog.plist"
+
+# === Logging Functions ===
+init_logging() {
+  # Initializes logging by redirecting stdout and stderr to a logfile.
+  local logfile="${1:-"$LOG_DIR/$(basename "${BASH_SOURCE[1]:-$0}" | cut -d '.' -f1).log"}"
+  mkdir -p "$(dirname "$logfile")"
+  exec > >(tee -a "$logfile") 2>&1
+}
+
+log() {
+  # Simple logging function with timestamp and log level.
+  local level="$1"
+  local message="$2"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') | $(echo "$level" | tr '[:lower:]' '[:upper:]') | $message"
+}
+
+# === Requirement Check ===
+check_prerequisites() {
+  # Verifies prerequisites before running the onboarding logic
+
+  if [[ ! -f "$PLIST_PATH" ]]; then
+    log "error" "LaunchDaemon plist not found at $PLIST_PATH. Exiting."
+    exit 1
+  fi
+}
+
+# === LaunchDaemon Bootstrapping ===
+bootstrap_launchdaemon() {
+  # Loads the LaunchDaemon if it is not already loaded
+  if launchctl print system | grep -q "$(basename "$PLIST_PATH")"; then
+    log "info" "LaunchDaemon is already loaded."
+    return
+  fi
+
+  log "info" "Bootstrapping LaunchDaemon: $PLIST_PATH"
+  if launchctl bootstrap system "$PLIST_PATH"; then
+    log "info" "LaunchDaemon bootstrapped successfully."
+  else
+    log "warn" "Failed to bootstrap LaunchDaemon. It may already be loaded or contain errors."
+  fi
+}
+
+# === Main Execution ===
+init_logging
+check_prerequisites
+bootstrap_launchdaemon
+touch "$RESOURCE_DIR/$PROJECT_NAME.installed"
+
+exit 0

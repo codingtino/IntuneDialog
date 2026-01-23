@@ -1,0 +1,45 @@
+{
+  "title": "Welcome to GGE!",
+  "icon": "/Library/Application Support/IntuneDialog/images/Logo.png",
+  "iconsize": 400,
+  "infobox": "Finalizing your Mac configuration.<br>This may take several minutes.<br>Ensure the device remains connected to power and do not close the lid or restart.",
+  "backgroundcolor": "#123123",
+  "listitem": [
+    {
+      "title": "Company Portal",
+      "icon": "/Library/Application Support/IntuneDialog/images/CompanyPortal.png",
+      "status": "pending",
+      "statustext": "Pending"
+    },
+    {
+      "title": "Microsoft Office 365",
+      "icon": "/Library/Application Support/IntuneDialog/images/MicrosoftOffice365.png",
+      "status": "pending",
+      "statustext": "Pending"
+    },
+    {
+      "title": "Microsoft Edge",
+      "icon": "/Library/Application Support/IntuneDialog/images/MicrosoftEdge.png",
+      "status": "pending",
+      "statustext": "Pending"
+    },
+    {
+      "title": "Adobe Acrobat",
+      "icon": "/Library/Application Support/IntuneDialog/images/AdobeAcrobat.png",
+      "status": "pending",
+      "statustext": "Pending"
+    },
+    {
+      "title": "uniFLOW SmartClient",
+      "icon": "/Library/Application Support/IntuneDialog/images/uniFLOW.png",
+      "status": "pending",
+      "statustext": "Pending"
+    },
+    {
+      "title": "ConnectWise Control",
+      "icon": "/Library/Application Support/IntuneDialog/images/ConnectWise.png",
+      "status": "pending",
+      "statustext": "Pending"
+    }
+  ]
+}

@@ -1,1 +1,1 @@
-# IntuneDialog
+# Intune-SwiftDialog
